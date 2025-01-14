@@ -1,0 +1,57 @@
+#include <ESP8266WiFi.h>
+#include <espnow.h>
+
+// Replace with the MAC address of the other ESP8266
+uint8_t peerMAC[] = {0x24, 0x0A, 0xC4, 0xXX, 0xXX, 0xXX};  // Change this to the MAC address of the other ESP8266
+
+// Callback function for when data is sent
+void onSent(uint8_t *mac_addr, uint8_t sendStatus) {
+  Serial.print("Send Status: ");
+  if (sendStatus == 0) {
+    Serial.println("Success");
+  } else {
+    Serial.println("Failed");
+  }
+}
+
+// Callback function for when data is received
+void onReceive(uint8_t *mac, uint8_t *incomingData, uint8_t len) {
+  char message[len + 1];
+  memcpy(message, incomingData, len);
+  message[len] = '\0'; // Null terminate the string
+
+  Serial.print("Received Message: ");
+  Serial.println(message);
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  // Initialize WiFi in STA mode (ESP8266 is not connecting to any router, just using ESP-NOW)
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();  // Disconnect from any router that may be connected
+
+  // Initialize ESP-NOW
+  if (esp_now_init() != 0) {
+    Serial.println("ESP-NOW Initialization Failed");
+    return;
+  }
+
+  // Register send and receive callbacks
+  esp_now_register_send_cb(onSent);
+  esp_now_register_recv_cb(onReceive);
+
+  // Add the peer device (other ESP8266)
+  esp_now_add_peer(peerMAC, ESP_NOW_ROLE_COMBO, 1, NULL, 0);
+
+  Serial.println("ESP-NOW Initialized");
+}
+
+void loop() {
+  // Send a test message
+  const char *message = "Hello from X1";  // Change this message as needed
+  
+  esp_now_send(peerMAC, (uint8_t *)message, strlen(message));
+
+  delay(2000);  // Wait 2 seconds before sending the next message
+}
