@@ -1,0 +1,107 @@
+#include <ESP8266WiFi.h>
+#include <espnow.h>
+#include <Keypad.h>
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+// Initialize the OLED display using I2C (SDA = D0, SCL = D8)
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+// Numpad setup
+const byte ROWS = 4;
+const byte COLS = 3;
+char keys[ROWS][COLS] = {
+  {'1', '2', '3'},
+  {'4', '5', '6'},
+  {'7', '8', '9'},
+  {'*', '0', '#'}
+};
+
+byte rowPins[ROWS] = {D1, D2, D3, D4};  // Rows connected to these pins
+byte colPins[COLS] = {D5, D6, D7};      // Columns connected to these pins
+Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
+
+// ESP-NOW peer MAC address (replace with the MAC address of the other ESP8266)
+uint8_t peerMAC[] = {0x24, 0x0A, 0xC4, 0xXX, 0xXX, 0xXX};
+
+// Callback when data is sent
+void onSent(uint8_t *mac_addr, uint8_t sendStatus) {
+  Serial.print("Send Status: ");
+  Serial.println(sendStatus == 0 ? "Success" : "Fail");
+}
+
+// Callback when data is received
+void onReceive(uint8_t *mac, uint8_t *incomingData, uint8_t len) {
+  char receivedKey[len + 1];
+  memcpy(receivedKey, incomingData, len);
+  receivedKey[len] = '\0'; // Null-terminate the received string
+  
+  // Display received key on the OLED
+  display.clearDisplay();
+  display.setCursor(0, 20);
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.println("Recv: ");
+  display.println(receivedKey);
+  display.display();
+}
+
+void setup() {
+  Serial.begin(115200);
+
+  // Initialize OLED display
+  if(!display.begin(SSD1306_I2C_ADDRESS, 0x3C)) { // Address 0x3C for most displays
+    Serial.println(F("SSD1306 allocation failed"));
+    for(;;);
+  }
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println(F("Numpad & OLED"));
+  display.display();
+  
+  // Initialize WiFi in STA mode
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+
+  // Initialize ESP-NOW
+  if (esp_now_init() != 0) {
+    Serial.println("ESP-NOW Initialization Failed");
+    return;
+  }
+
+  // Register send and receive callbacks
+  esp_now_set_self_role(ESP_NOW_ROLE_COMBO);
+  esp_now_register_send_cb(onSent);
+  esp_now_register_recv_cb(onReceive);
+
+  // Register peer
+  esp_now_add_peer(peerMAC, ESP_NOW_ROLE_COMBO, 1, NULL, 0);
+}
+
+void loop() {
+  char key = keypad.getKey(); // Check if a key is pressed
+
+  if (key) {
+    // Print key to Serial Monitor for debugging
+    Serial.print("Key Pressed: ");
+    Serial.println(key);
+    
+    // Send the pressed key to the peer device
+    esp_now_send(peerMAC, (uint8_t *)&key, sizeof(key));
+    
+    // Display the pressed key on the local OLED
+    display.clearDisplay();
+    display.setCursor(0, 0);
+    display.setTextSize(1);
+    display.setTextColor(SSD1306_WHITE);
+    display.println("Sent: ");
+    display.println(key);
+    display.display();
+  }
+}
