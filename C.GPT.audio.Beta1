@@ -1,0 +1,50 @@
+#include <Arduino.h>
+#include <FS.h>
+#include <SPIFFS.h>
+#include <ESP8266Audio.h>
+#include <AudioFileSourceSPIFFS.h>
+#include <AudioGeneratorWAV.h>
+#include <AudioOutputI2S.h>
+
+// Obiecte pentru redare audio
+AudioGeneratorWAV *wav;
+AudioFileSourceSPIFFS *file;
+AudioOutputI2S *out;
+
+void setup() {
+  Serial.begin(115200);
+  
+  // Inițializare SPIFFS
+  if (!SPIFFS.begin()) {
+    Serial.println("Eroare la montarea SPIFFS!");
+    while (true);
+  }
+  
+  Serial.println("SPIFFS montat cu succes!");
+  
+  // Configurare I2S
+  out = new AudioOutputI2S();
+  out->SetPinout(14, 3, 15); // Setare pinii BCLK, LRC, DIN
+  out->SetOutputModeMono(true); // Setare mono
+  out->SetGain(0.5); // Setare volum
+  
+  // Deschidere fișier audio din SPIFFS
+  file = new AudioFileSourceSPIFFS("/sample.wav");
+  wav = new AudioGeneratorWAV();
+  
+  // Pornire redare fișier audio
+  if (!wav->begin(file, out)) {
+    Serial.println("Nu s-a putut începe redarea audio!");
+  }
+}
+
+void loop() {
+  if (wav->isRunning()) {
+    if (!wav->loop()) {
+      wav->stop();
+      Serial.println("Redare terminată.");
+    }
+  } else {
+    delay(1000); // Așteaptă înainte de a reporni redarea sau alte operații
+  }
+}
