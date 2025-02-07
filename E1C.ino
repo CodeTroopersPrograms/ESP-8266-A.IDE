@@ -24,7 +24,7 @@ byte colPins[COLS] = {D5, D6, D7};     // Column pins
 Keypad keypad = Keypad(makeKeymap(keys), rowPins, colPins, ROWS, COLS);
 
 const int buzzerPin = D8; // Buzzer pin
-uint8_t peerMAC[] = {0x84, 0xF3, 0xEB, 0x62, 0x92, 0x62}; // MAC-ul E2
+uint8_t peerMAC[] = {0x40, 0x91, 0x51, 0x45, 0x65, 0xCB}; // MAC-ul E2
 
 void onReceive(uint8_t *mac, uint8_t *data, uint8_t len) {
   char receivedKey = (char)data[0];
