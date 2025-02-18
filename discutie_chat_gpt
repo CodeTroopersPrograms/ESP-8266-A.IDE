@@ -1,0 +1,181 @@
+//Step 1: MKR1000-1 (Keypad Input → Serial to ESP8266-1)
+
+//The first MKR1000 will send data to ESP8266-1 just like before.
+
+#include <Keypad.h>
+
+const byte ROW_NUM    = 4;  // Four rows
+const byte COLUMN_NUM = 3;  // Three columns
+
+char keys[ROW_NUM][COLUMN_NUM] = {
+  {'1','2','3'},
+  {'4','5','6'},
+  {'7','8','9'},
+  {'*','0','#'}
+};
+
+byte pin_rows[ROW_NUM] = {9, 8, 7, 6};   // Rows connected to pins 9, 8, 7, 6
+byte pin_column[COLUMN_NUM] = {5, 4, 3}; // Columns connected to pins 5, 4, 3
+
+Keypad keypad = Keypad( makeKeymap(keys), pin_rows, pin_column, ROW_NUM, COLUMN_NUM );
+
+void setup() {
+  Serial.begin(115200);  // Initialize Serial communication
+}
+
+void loop() {
+  char key = keypad.getKey(); // Get key press
+  if (key) {
+    Serial.println(key);  // Send key press to ESP8266-1 via Serial
+  }
+}
+
+//Step 2: ESP8266-1 (Receive Serial Data → Send via ESP-NOW to ESP8266-2)
+
+//ESP8266-1 forwards data to ESP8266-2, and it also listens for incoming data from ESP8266-2 and sends it back to MKR1000-1.
+
+#include <ESP8266WiFi.h>
+#include <espnow.h>
+
+uint8_t peerMAC_1[] = {0x84, 0xF3, 0xEB, 0x62, 0x92, 0x87};  // MAC of ESP8266-2
+uint8_t peerMAC_2[] = {0x84, 0xF3, 0xEB, 0x62, 0x92, 0x4F};  // MAC of ESP8266-1 (for return)
+
+void onSent(uint8_t *mac_addr, uint8_t sendStatus) {
+  Serial.print("Send Status: ");
+  Serial.println(sendStatus == 0 ? "Success" : "Failed");
+}
+
+void onReceive(uint8_t *mac, uint8_t *incomingData, uint8_t len) {
+  char message[len + 1];
+  memcpy(message, incomingData, len);
+  message[len] = '\0';
+
+  // Forward received data back to MKR1000-1 via Serial
+  Serial.println("Received from ESP8266-2: " + String(message));
+  Serial.print(message);  // Send data to MKR1000-1
+}
+
+void setup() {
+  Serial.begin(115200);  // Initialize Serial communication
+  Serial.swap();  // Use GPIO3 (RX) for Serial communication with MKR1000
+
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+
+  if (esp_now_init() != 0) {
+    Serial.println("ESP-NOW Init Failed");
+    return;
+  }
+
+  esp_now_register_send_cb(onSent);
+  esp_now_register_recv_cb(onReceive);
+  
+  esp_now_add_peer(peerMAC_1, ESP_NOW_ROLE_COMBO, 1, NULL, 0);
+  esp_now_add_peer(peerMAC_2, ESP_NOW_ROLE_COMBO, 1, NULL, 0);  // Add both peers
+
+  Serial.println("ESP8266-1 Ready");
+}
+
+void loop() {
+  if (Serial.available()) {
+    String receivedData = Serial.readStringUntil('\n');
+    Serial.print("Forwarding: ");
+    Serial.println(receivedData);
+
+    esp_now_send(peerMAC_1, (uint8_t *)receivedData.c_str(), receivedData.length());  // Send to ESP8266-2
+
+    // After sending, wait for the response
+    delay(500);
+  }
+}
+
+//Step 3: ESP8266-2 (Receive via ESP-NOW → Send via Serial to MKR1000-2)
+
+//ESP8266-2 receives data via ESP-NOW, then forwards it to MKR1000-2, and also listens for input from the second keypad to send it back to ESP8266-1.
+
+#include <ESP8266WiFi.h>
+#include <espnow.h>
+
+void onReceive(uint8_t *mac, uint8_t *incomingData, uint8_t len) {
+  char message[len + 1];
+  memcpy(message, incomingData, len);
+  message[len] = '\0';
+
+  Serial.println("Received via ESP-NOW from ESP8266-1: " + String(message));
+
+  // Forward data to MKR1000-2 via Serial
+  Serial.print(message);  // Send to MKR1000-2
+}
+
+void setup() {
+  Serial.begin(115200);  // Initialize Serial communication
+  Serial.swap();  // Use GPIO3 (TX) to send data to MKR1000-2
+
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+
+  if (esp_now_init() != 0) {
+    Serial.println("ESP-NOW Init Failed");
+    return;
+  }
+
+  esp_now_register_recv_cb(onReceive);
+  Serial.println("ESP8266-2 Ready");
+}
+
+void loop() {
+  // Continuously receive and forward data
+}
+
+//Step 4: MKR1000-2 (Receive via Serial → Output on OLED)
+
+//This remains the same as before; MKR1000-2 receives data from ESP8266-2 and displays it on an OLED.
+
+#include <Wire.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+// OLED dimensions
+#define SCREEN_WIDTH 128
+#define SCREEN_HEIGHT 64
+
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, -1);
+
+void setup() {
+  Serial.begin(115200);  // Initialize Serial communication
+
+  if (!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    Serial.println(F("OLED not detected!"));
+    while (true);  // Halt if OLED not found
+  }
+
+  display.clearDisplay();  // Clear the display
+}
+
+void loop() {
+  if (Serial.available()) {
+    char receivedChar = Serial.read();
+    display.clearDisplay();  // Clear previous shapes
+
+    // Example: Draw shapes based on key press (e.g., '1' for circle, '2' for rectangle)
+    if (receivedChar == '1') {
+      display.fillCircle(64, 32, 20, WHITE);  // Draw circle at the center
+    } else if (receivedChar == '2') {
+      display.fillRect(40, 20, 50, 30, WHITE);  // Draw rectangle
+    } else if (receivedChar == '3') {
+      display.drawLine(10, 10, 118, 54, WHITE);  // Draw diagonal line
+    }
+
+    display.display();  // Update OLED
+  }
+}
+
+/*Summary of Two-Way Communication Flow:
+
+    MKR1000-1 reads the keypad and sends data to ESP8266-1.
+    ESP8266-1 forwards data to ESP8266-2 via ESP-NOW.
+    ESP8266-2 forwards the data to MKR1000-2, which displays it on the OLED.
+    A second keypad connected to MKR1000-2 sends data to ESP8266-2.
+    ESP8266-2 sends data back to ESP8266-1, which forwards it to MKR1000-1 to display it on another OLED.
+
+This way, you have a complete two-way communication system where data can flow in both directions! You can extend this with more devices or customize the data and display based on your needs. Let me know if you need more details!*/
