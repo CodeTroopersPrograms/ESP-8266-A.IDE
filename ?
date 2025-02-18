@@ -1,0 +1,72 @@
+#include <Wire.h>
+#include <Keypad.h>
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+
+// Definirea pinilor pentru rânduri și coloane
+const byte ROW_NUM    = 4; // 4 rânduri
+const byte COLUMN_NUM = 3; // 3 coloane
+
+// Harta pentru butoanele keypad-ului (4x3)
+char keys[ROW_NUM][COLUMN_NUM] = {
+  {'1', '2', '3'},
+  {'4', '5', '6'},
+  {'7', '8', '9'},
+  {'*', '0', '#'}
+};
+
+// Pinii la care sunt conectate rândurile și coloanele
+byte pin_rows[ROW_NUM] = {23, 19, 18, 5};  // Rânduri conectate la GPIO 23, 22, 21, 19
+byte pin_columns[COLUMN_NUM] = {17, 16, 4};  // Coloane conectate la GPIO 18, 5, 4
+
+// Crearea unui obiect Keypad fără a apela begin()
+Keypad keypad = Keypad(makeKeymap(keys), pin_rows, pin_columns, ROW_NUM, COLUMN_NUM);
+
+// Definirea ecranului OLED
+#define SCREEN_WIDTH 128 // Lățimea ecranului OLED
+#define SCREEN_HEIGHT 64 // Înălțimea ecranului OLED
+#define OLED_RESET    -1 // Resetarea OLED nu este necesară
+Adafruit_SSD1306 display(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+
+void setup() {
+  // Inițializarea serială
+  Serial.begin(115200);
+  
+  // Definirea pinilor I2C
+  Wire.begin(21, 22);  // SDA pe GPIO 21, SCL pe GPIO 22
+  
+  // Nu mai apelăm keypad.begin() deoarece inițializarea este realizată de constructorul Keypad
+
+  // Inițializarea ecranului OLED
+  if(!display.begin(SSD1306_SWITCHCAPVCC, 0x3C)) {  
+    Serial.println(F("Ecran OLED nu a fost găsit!"));
+    for(;;); // Se oprește programul dacă nu găsește ecranul
+  }
+  
+  // Șterge ecranul și setarea inițială a textului
+  display.clearDisplay();
+  display.setTextSize(1);
+  display.setTextColor(SSD1306_WHITE);
+  display.setCursor(0, 0);
+  display.println("Keypad 4x3:");
+  display.display();
+}
+
+void loop() {
+  char key = keypad.getKey(); // Obține butonul apăsat
+
+  if (key) {  // Dacă un buton a fost apăsat
+    Serial.print("Ai apăsat: ");
+    Serial.println(key);  // Afișează valoarea butonului apăsat
+    
+    // Afișează pe ecranul OLED
+    display.clearDisplay(); // Șterge ecranul
+    display.setCursor(0, 0); // Resetează cursorul pe ecran
+    display.println("Keypad 4x3:"); // Titlu
+    display.print("Ai apăsat: "); // Text informativ
+    display.println(key); // Butonul apăsat
+    display.display(); // Afișează pe ecran
+    
+    delay(500);  // Întârziere pentru a preveni afișarea rapidă
+  }
+}
