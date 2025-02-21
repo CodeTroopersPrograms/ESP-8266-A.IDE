@@ -32,17 +32,35 @@ void onReceive(const esp_now_recv_info_t *info, const uint8_t *data, int len) {
 
   switch (receivedKey) {
     case '1':
-      display.drawCircle(64, 32, 20 , SSD1306_WHITE);
-      break;
+        display.drawLine(64, 20, 64, 60, SSD1306_WHITE);  // Linie verticală
+        display.drawLine(64, 20, 56, 30, SSD1306_WHITE);  // Linie dreaptă stânga (vârful săgeții)
+        display.drawLine(64, 20, 72, 30, SSD1306_WHITE);  // Linie dreaptă dreapta (vârful săgeții)
+    
+        display.setCursor(50, 65);
+        display.println("Iesire la suprafata");
+        break;
     case '2':
-      display.fillRect(48, 16, 32, 32, SSD1306_WHITE);
-      break;
+        display.drawLine(64, 60, 64, 20, SSD1306_WHITE);  // Linie verticală
+        display.drawLine(64, 60, 56, 50, SSD1306_WHITE);  // Linie dreaptă stânga
+        display.drawLine(64, 60, 72, 50, SSD1306_WHITE);  // Linie dreaptă dreapta
+
+        display.setCursor(50, 65);
+        display.println("Scufundare");
+        break;
     case '3':
-      display.drawTriangle(32, 48, 96, 48, 64, 16, SSD1306_WHITE);
-      break;
+        display.drawLine(64, 20, 64, 60, SSD1306_WHITE);  // Linia verticală (partea principală a semnului)
+        display.fillCircle(64, 80, 6, SSD1306_WHITE);  // Cercul mic de jos (punctul semnului)
+
+        display.setCursor(50, 90);
+        display.println("Ajutor!");
+        break;
     case '4':
-      display.drawLine(10, 10, 118, 54, SSD1306_WHITE);
-      break;
+        display.drawLine(40, 50, 60, 70, SSD1306_WHITE);  // Linia diagonală din stânga jos
+        display.drawLine(60, 70, 90, 30, SSD1306_WHITE);  // Linia diagonală din dreapta
+
+        display.setCursor(50, 80);
+        display.println("Bifa");
+        break;
     case '5':
       display.fillCircle(64, 32, 10, SSD1306_WHITE);
       break;
